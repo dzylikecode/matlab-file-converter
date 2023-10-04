@@ -12,8 +12,8 @@ const convertFile = path.join(curDir, "convert.m");
  */
 async function ConvertMlxToM(srcFiles, destFiles) {
   const matString = `clear; clc;
-srcFiles = [${srcFiles.join(",")}];
-destFiles = [${destFiles.join(",")}];
+srcFiles = [${srcFiles.map((file) => `"${file}"`).join(",")}];
+destFiles = [${destFiles.map((file) => `"${file}"`).join(",")}];
 for i = 1:length(srcFiles)
     mlxFile = srcFiles(i);
     mFile = destFiles(i);
@@ -80,14 +80,11 @@ async function ConvertMlx(srcFiles) {
     const { dir, name } = path.parse(file);
     return path.join(dir, name + ".m");
   });
-  return await ConvertMlxToM(
-    srcFiles.map((file) => {
-      return `"${file}"`;
-    }),
-    destFiles.map((file) => {
-      return `"${file}"`;
-    })
+  const [updateSrcFiles, updateDestFiles] = filterUpdateFile(
+    srcFiles,
+    destFiles
   );
+  return await ConvertMlxToM(updateSrcFiles, updateDestFiles);
 }
 
 async function ConvertM(srcFiles) {
@@ -95,14 +92,33 @@ async function ConvertM(srcFiles) {
     const { dir, name } = path.parse(file);
     return path.join(dir, name + ".mlx");
   });
-  return await ConvertMToMlx(
-    srcFiles.map((file) => {
-      return `"${file}"`;
-    }),
-    destFiles.map((file) => {
-      return `"${file}"`;
-    })
+  const [updateSrcFiles, updateDestFiles] = filterUpdateFile(
+    srcFiles,
+    destFiles
   );
+  return await ConvertMToMlx(updateSrcFiles, updateDestFiles);
+}
+
+function isNewer(a, b) {
+  if (!fs.existsSync(a)) return false;
+  const stat1 = fs.statSync(a);
+  const stat2 = fs.statSync(b);
+
+  return stat1.mtimeMs > stat2.mtimeMs;
+}
+
+function filterUpdateFile(srcFiles, destFiles) {
+  const updateSrcFiles = [];
+  const updateDestFiles = [];
+  for (let i = 0; i < srcFiles.length; i++) {
+    const srcFile = srcFiles[i];
+    const destFile = destFiles[i];
+    if (!fs.existsSync(destFile) || isNewer(srcFile, destFile)) {
+      updateSrcFiles.push(srcFile);
+      updateDestFiles.push(destFile);
+    }
+  }
+  return [updateSrcFiles, updateDestFiles];
 }
 
 module.exports = {
